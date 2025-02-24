@@ -18,28 +18,32 @@ class Surface:
         self.index2 = index2
 
     def normals(self, points):
-        """ Calculate the normal of the surface at a given point
+        """ Calculate the normal of the surface at given points
         Args:
           points: a N x 2 numpy array representing the point in 2D (surface coordinates) space
         Returns:
-          a N x 2 numpy array representing the normal (in surface coordinates) of the surface at these points"""
+          a N x 3 numpy array representing the normal (in surface coordinates) of the surface at these points"""
         # We are going to use the gradient of the sag function to calculate the normal.
         # For this we need to choose a good epsilon in x and y, not too small to avoid numerical errors, but not too large
         # to avoid sampling errors for a high frequency sag function. Choosing something close to the wavelength of light
         # is a good compromise.
         epsilon = 100e-9
         sag = self.sag(points)
-        dsag_dx = (self.sag(points + np.array([epsilon, 0])) - sag) / epsilon
-        dsag_dy = (self.sag(points + np.array([0, epsilon])) - sag) / epsilon
-        v1 = np.array([dsag_dx, 0, 1])
-        v2 = np.array([0, dsag_dy, 1])
-        normals = np.zeros((points.shape[0], 2))
-        normals[:, 0] = epsilon
-        normals[:, 1] = epsilon
-        normals[:, 0] = -sag_x
-        # Given that dimensions are in meters, we can use a delta
-        # in t
-
+        dsag_dx = (self.sag(points + np.array([epsilon, 0])) - sag)
+        dsag_dy = (self.sag(points + np.array([0, epsilon])) - sag)
+        # The two tangent vectors are (epsilon, 0, dsag_dx) and (0, epsilon, dsag_dy)
+        # The normal is the cross product of these two vectors
+        # The coordinates of the crossproduct end up being:
+        # (- epsilon * dsag_dx, - epsilon * dsag_dy, epsilon^2)
+        # but because we are going to normalize the vector anyway, we can just use:
+        # (-dsag_dx, -dsag_dy, epsilon)
+        norm = np.sqrt(dsag_dx**2 + dsag_dy**2 + epsilon**2)
+        nx = -dsag_dx / norm
+        ny = -dsag_dy / norm
+        nz = epsilon / norm
+        normals = np.array([nx, ny, nz]).T
+        
+        return normals
 
     def intersections(self, ray_bundle):
         """ Calculate the intersection of a RayBundle with the surface
