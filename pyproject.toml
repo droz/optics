@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "optics"
+authors = [
+    {name = "Pierre-Yves Droz", email = "py.droz@gmail.com"},
+]
+description = "Simple sequential ray-tracing library"
+readme = "README.rst"
+requires-python = ">=3.7"
+keywords = ["optics", "ray-tracing", "lens", "mirror"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    'importlib-meitadata; python_version<"3.8"',
+    'numpy',
+    'chart_studio',
+]
+dynamic = ["version"]
+
+[project.scripts]
+optics_demo = "optics.optics:run"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
