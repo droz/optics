@@ -17,6 +17,14 @@ class Surface:
         self.index1 = index1
         self.index2 = index2
 
+    def sag(self, points):
+        """ Calculate the sag of the surface for an aray of 2D points
+        Args:
+          points: a N x 2 numpy array representing the point in 2D (surface coordinates) space
+        Returns:
+          a N x 1 numpy array representing the sag of the surface at these points"""
+        raise NotImplementedError("sag() is not implemented by the base class")
+
     def normals(self, points):
         """ Calculate the normal of the surface at given points
         Args:
@@ -42,7 +50,7 @@ class Surface:
         ny = -dsag_dy / norm
         nz = epsilon / norm
         normals = np.array([nx, ny, nz]).T
-        
+
         return normals
 
     def intersections(self, ray_bundle):
@@ -75,6 +83,19 @@ class Surface:
         
         raise NotImplementedError("propagate() is not implemented")
 
+    def mesh(self):
+        """ Generate a mesh representing the surface. Used to display the surfaces
+        Returns:
+          mesh_x: The x coordinates of the mesh points, as a 2D array
+          mesh_y: The y coordinates of the mesh points, as a 2D array
+          mesh_z: The z coordinates of the mesh points, as a 2D array"""
+        mesh_x, mesh_y = self.aperture.mesh()
+        xs = mesh_x.flatten()
+        ys = mesh_y.flatten()
+        points2d = np.array([xs, ys]).T
+        zs = self.sag(points2d)
+        mesh_z = np.reshape(zs, mesh_x.shape)
+        return mesh_x, mesh_y, mesh_z
 
 class SphericalSurface(Surface):
     """ A SphericalSurface is a Surface that has a spherical sag function"""
@@ -102,16 +123,3 @@ class SphericalSurface(Surface):
         else:
             return self.radius - np.sqrt(self.radius**2 - r2)
 
-    def mesh(self):
-        """ Generate a mesh representing the surface. Used to display the surfaces
-        Returns:
-          mesh_x: The x coordinates of the mesh points, as a 2D array
-          mesh_y: The y coordinates of the mesh points, as a 2D array
-          mesh_z: The z coordinates of the mesh points, as a 2D array"""
-        mesh_x, mesh_y = self.aperture.mesh()
-        xs = mesh_x.flatten()
-        ys = mesh_y.flatten()
-        points2d = np.array([xs, ys]).T
-        zs = self.sag(points2d)
-        mesh_z = np.reshape(zs, mesh_x.shape)
-        return mesh_x, mesh_y, mesh_z

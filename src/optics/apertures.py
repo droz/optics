@@ -2,7 +2,8 @@ import numpy as np
 
 class Aperture:
     """ Apertures are limits in local (x, y) coordinates that can be used to filter rays
-    A derived class should implement the contains function, which checks if a point is inside the aperture."""
+    A derived class should implement the contains function, which checks if a point is inside the aperture,
+    and the mesh function, which generates a mesh of points that are inside the aperture"""
     def contains(self, points):
         """ Check if a point is inside the aperture
         Args:
@@ -10,6 +11,7 @@ class Aperture:
         Returns:
           a N x 1 numpy array of booleans representing if the points are inside the aperture"""
         raise NotImplementedError("contains() is not implemented")
+
     def mesh(self):
         """ Generate a mesh of points that are inside the aperture. Used to display the surfaces
         Returns:

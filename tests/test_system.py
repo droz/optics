@@ -1,6 +1,7 @@
 from optics.surfaces import SphericalSurface
 from optics.apertures import CircularAperture, RectangularAperture
 from optics.display import display
+from optics.sources import GaussianBeamSource
 import numpy as np
 
 # Create a spherical surface with a circular aperture
@@ -15,4 +16,9 @@ surface = SphericalSurface(origin, rotation, aperture, index1, index2, radius)
 
 points = np.array([[0, 0], [0.5, 0], [0, 0.5], [0.5, 0.5]])
 
-display(surface, show_normals=True)
+source = GaussianBeamSource(np.array([0, 0, 0]), np.array([0, 0, 1]), 1e-6, 2e-6, 1, 850e-9)
+rays = source.generate(100)
+
+display(rays)
+
+#display(surface, show_normals=True)
