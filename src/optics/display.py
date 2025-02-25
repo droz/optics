@@ -99,15 +99,16 @@ def rayBundleSceneData(rays: RayBundle, show_display_rays: bool, show_all_rays: 
     Returns:
         a list of graph objects that can be displayed with plotly"""
     scene_data = []
-    def line_data(rays, idx, color):
+    def line_data(rays, idx, color, opacity):
         """ Generate the data for a set of indexes"""
+        scene_data = []
         # Get the origins of the rays
         origins = rays.origins[idx]
         lengths = rays.lengths[idx]
         directions = rays.directions[idx]
 
         # Start with bound (non-zero length) rays    
-        idx_bound = np.where(lengths[idx] != 0)[0]
+        idx_bound = np.where(lengths != 0)[0]
         # Get the endpoints of the rays
         origins_bound = origins[idx_bound]
         endpoints_bound = origins[idx_bound] + directions[idx_bound] * lengths[idx_bound][:, np.newaxis]
@@ -115,9 +116,10 @@ def rayBundleSceneData(rays: RayBundle, show_display_rays: bool, show_all_rays: 
         x_bound = np.vstack((origins_bound[:, 0], endpoints_bound[:, 0], nans_bound)).T.flatten()
         y_bound = np.vstack((origins_bound[:, 1], endpoints_bound[:, 1], nans_bound)).T.flatten()
         z_bound = np.vstack((origins_bound[:, 2], endpoints_bound[:, 2], nans_bound)).T.flatten()
+        scene_data.append(graphs.Scatter3d(x=x_bound, y=y_bound, z=z_bound, mode='lines', line=dict(color=color, width=2), opacity=opacity, showlegend=False))
 
         # Then deal with unbound rays
-        idx_unbound = np.where(lengths[idx] == 0)[0]
+        idx_unbound = np.where(lengths == 0)[0]
         # We need to decide on a length
         # If there are any bound rays in the bundle, we use the average of their length
         idx_bound_all = np.where(rays.lengths != 0)[0]
@@ -132,47 +134,33 @@ def rayBundleSceneData(rays: RayBundle, show_display_rays: bool, show_all_rays: 
         x_unbound = np.vstack((origins_unbound[:, 0], endpoints_unbound[:, 0], nans_unbound)).T.flatten()
         y_unbound = np.vstack((origins_unbound[:, 1], endpoints_unbound[:, 1], nans_unbound)).T.flatten()
         z_unbound = np.vstack((origins_unbound[:, 2], endpoints_unbound[:, 2], nans_unbound)).T.flatten()
-        # Add dashes at the end of the rays
-        dash_start = endpoints_unbound
-        num_dash = 10
-        for i in range(num_dash):
-            dash_length = length * 0.05 * (num_dash - i) / num_dash
-            dash_end = dash_start + directions[idx_unbound] * dash_length * 0.5
-            dash_start = dash_start + directions[idx_unbound] * dash_length
-            x_dash = np.vstack((dash_start[:, 0], dash_end[:, 0], nans_unbound)).T.flatten()
-            y_dash = np.vstack((dash_start[:, 1], dash_end[:, 1], nans_unbound)).T.flatten()
-            z_dash = np.vstack((dash_start[:, 2], dash_end[:, 2], nans_unbound)).T.flatten()
-            x_unbound = np.concatenate((x_unbound, x_dash))
-            y_unbound = np.concatenate((y_unbound, y_dash))
-            z_unbound = np.concatenate((z_unbound, z_dash))
+        scene_data.append(graphs.Scatter3d(x=x_unbound, y=y_unbound, z=z_unbound, mode='lines', line=dict(color=color, width=2), opacity=opacity, showlegend=False))
+
+        # Add dashed lines at the end of the unbound rays
+        dash_end = endpoints_unbound + directions[idx_unbound] * length * 0.1
+        x_dash = np.vstack((endpoints_unbound[:, 0], dash_end[:, 0], nans_unbound)).T.flatten()
+        y_dash = np.vstack((endpoints_unbound[:, 1], dash_end[:, 1], nans_unbound)).T.flatten()
+        z_dash = np.vstack((endpoints_unbound[:, 2], dash_end[:, 2], nans_unbound)).T.flatten()
+        scene_data.append(graphs.Scatter3d(x=x_dash, y=y_dash, z=z_dash, mode='lines', line=dict(color=color, width=2, dash='dash'), opacity=opacity, showlegend=False))
 
         # Now we can build the scene data
         x = np.concatenate((x_bound, x_unbound))
         y = np.concatenate((y_bound, y_unbound))
         z = np.concatenate((z_bound, z_unbound))
-        return graphs.Scatter3d(x=x, y=y, z=z, mode='lines', line=dict(color=color, width=2), showlegend=False)
+        return scene_data
 
 
     if show_display_rays:
-        scene_data.append(line_data(rays, rays.display_rays, 'blue'))
+        scene_data += line_data(rays, rays.display_rays, 'blue', 1)
     if show_all_rays:
         indexes = list(set(range(rays.origins.shape[0])) - set(rays.display_rays))
-        scene_data.append(line_data(rays, indexes, 'black'))
+        # If there are too many rays, we need to sub-sample
+        if len(indexes) > 10000:
+            indexes = np.random.choice(indexes, 10000, replace=False)
+        opacity = min(300 / len(indexes), 1.0)
+        scene_data += line_data(rays, indexes, 'black', opacity)
 
     return scene_data
-
-    #    # For all the rays that are unbound, use the maximum size of the source as the length
-    #    scale = np.linalg.norm(rays.origins.max(axis=0) - rays.origins.min(axis=0))
-    #    lengths = np.where(rays.lengths == 0, scale, rays.lengths)
-    #    endpoints = rays.origin + rays.directions * lengths[:, np.newaxis]
-    #    nans = np.full((1, points.shape[0]), np.nan)
-    #    nx = np.vstack((points[:, 0], endpoints[:, 0], nans)).T.flatten()
-    #    ny = np.vstack((points[:, 1], endpoints[:, 1], nans)).T.flatten()
-    #    nz = np.vstack((points[:, 2], endpoints[:, 2], nans)).T.flatten()
-    #    scene_data.append(graphs.Scatter3d(x=nx, y=ny, z=nz,
-    #                                       mode='lines', line=dict(color='red', width=2), showlegend=False
-    #                                       ))
-        
 
 def display(object: object,
             show_surface: bool = True,

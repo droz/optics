@@ -16,9 +16,12 @@ surface = SphericalSurface(origin, rotation, aperture, index1, index2, radius)
 
 points = np.array([[0, 0], [0.5, 0], [0, 0.5], [0.5, 0.5]])
 
-source = GaussianBeamSource(np.array([0, 0, 0]), np.array([0, 0, 1]), 1e-6, 2e-6, 1, 850e-9)
-rays = source.generate(100)
+rotation = [[-1, 0, 0],
+            [0, 0, 1],
+            [0, 1, 0]]
+source = GaussianBeamSource(np.array([0, 0, 0]), rotation, 1e-6, 2e-6, 1, 850e-9)
+rays = source.generate(100000)
 
-display(rays)
+display(rays, show_all_rays=True)
 
 #display(surface, show_normals=True)

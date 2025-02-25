@@ -8,6 +8,7 @@ class Surface:
         Args:
           origin: 1 x 3 numpy array representing the origin of the surface in 3D space
           rotation: 3 x 3 numpy array representing the rotation matrix of the surface in 3D space
+                    this matrix transforms local surface coordinates to global coordinates
           aperture: an Aperture object representing the aperture of the surface
           index1: the index of refraction of the medium the light is coming from
           index2: the index of refraction of the medium the light is going to. If 0, this is a mirror."""
