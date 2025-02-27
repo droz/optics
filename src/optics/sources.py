@@ -1,10 +1,10 @@
-from optics.rays import RayBundle
+from .rays import RayBundle
 import numpy as np
 
 class Source:
     """Sources are objects that generate ray bundles.
     A derived class should implement the generate function, which generates a ray bundle."""
-    def __init__(self, origin, rotation):
+    def __init__(self, origin: np.ndarray, rotation: np.ndarray):
         """ Create a Source object
         Args:
             origin: 1 x 3 numpy array representing the origin of the source in 3D space
@@ -13,17 +13,23 @@ class Source:
         self.origin = origin
         self.rotation = rotation
 
-    def generate(self, n_rays):
+    def generate(self, n_rays: int):
         """ Generate a ray bundle
         Args:
             n_rays: the number of rays to generate
         Returns:
             a RayBundle object"""
         raise NotImplementedError("generate() is not implemented by the base class")
-    
+
 class GaussianBeamSource(Source):
     """ A GaussianBeamSource is a Source that generates a Gaussian beam"""
-    def __init__(self, origin, direction, waist_x, waist_y, power_w, wavelength_m):
+    def __init__(self,
+                 origin: np.ndarray,
+                 rotation: np.ndarray,
+                 waist_x: float,
+                 waist_y: float,
+                 power_w: float,
+                 wavelength_m: float):
         """ Create a GaussianBeamSource object
         Args:
             origin: 1 x 3 numpy array representing the origin of the source in 3D space
@@ -32,13 +38,13 @@ class GaussianBeamSource(Source):
             waist_y: the waist of the beam in the y direction
             power_w: the power of the source, in watts
             wavelength_m: the wavelength of the source in meters"""
-        super().__init__(origin, direction)
+        super().__init__(origin, rotation)
         self.waist_x = waist_x
         self.waist_y = waist_y
         self.wavelength_m = wavelength_m
         self.power_w = power_w
 
-    def generate(self, n_rays):
+    def generate(self, n_rays: int):
         """ Generate a ray bundle
         Args:
             n_rays: The number of rays to generate.
@@ -88,7 +94,8 @@ class GaussianBeamSource(Source):
             powers_w = powers,
             display_rays = range(1 + num_ellipse_rays))
 
+        # Clean up the rays and move them to the global frame
         rays.normalizeDirections()
-        rays.transformFromLocalToGlobal(self.origin, self.rotation)
+        rays.origins, rays.directions = rays.localToGlobal(self.origin, self.rotation)
 
         return rays

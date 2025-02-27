@@ -4,7 +4,7 @@ class Aperture:
     """ Apertures are limits in local (x, y) coordinates that can be used to filter rays
     A derived class should implement the contains function, which checks if a point is inside the aperture,
     and the mesh function, which generates a mesh of points that are inside the aperture"""
-    def contains(self, points):
+    def contains(self, points: np.ndarray):
         """ Check if a point is inside the aperture
         Args:
           points: a N x 2 numpy array representing the point in 2D (surface coordinates) space
@@ -21,27 +21,27 @@ class Aperture:
 
 class CircularAperture(Aperture):
     """ A CircularAperture is an aperture that is a circle"""
-    def __init__(self, radius):
+    def __init__(self, diameter: float):
         """ Create a CircularAperture object
         Args:
-          radius: the radius of the aperture"""
-        self.radius = radius
+          diameter: the diameter of the aperture"""
+        self.diameter = diameter
 
-    def contains(self, points):
+    def contains(self, points: np.ndarray):
         """ Check if a point is inside the aperture
         Args:
           points: a N x 2 numpy array representing the point in 2D space
         Returns:
           a N x 1 numpy array of booleans representing if the points are inside the aperture"""
-        return np.norm(points, axis=1) < self.radius
+        return np.norm(points, axis=1) < self.diameter / 2
 
     def mesh(self):
         """ Generate a mesh of points that are inside the aperture. Used to display the surfaces.
         Returns:
           mesh_x: The x coordinates of the mesh points, as a 2D array
           mesh_y: The y coordinates of the mesh points, as a 2D array"""
-        thetas = np.linspace(0, 2 * np.pi, 30)
-        rs = np.linspace(0, self.radius, 15)
+        thetas = np.linspace(0, 2 * np.pi, 40)
+        rs = np.linspace(0, self.diameter / 2, 20)
         thetagrid, rgrid = np.meshgrid(thetas, rs)
         mesh_x = rgrid * np.cos(thetagrid)
         mesh_y = rgrid * np.sin(thetagrid)
@@ -49,7 +49,7 @@ class CircularAperture(Aperture):
 
 class RectangularAperture(Aperture):
     """ A RectanularAperture is an aperture that is a rectangle"""
-    def __init__(self, size_x, size_y):
+    def __init__(self, size_x: float, size_y: float):
         """ Create a RectangularAperture object
         Args:
           size_x: the x extent of the aperture
@@ -57,7 +57,7 @@ class RectangularAperture(Aperture):
         self.size_x = size_x
         self.size_y = size_y
 
-    def contains(self, points):
+    def contains(self, points: np.ndarray):
         """ Check if a point is inside the aperture
         Args:
           points: a N x 2 numpy array representing the point in 2D space

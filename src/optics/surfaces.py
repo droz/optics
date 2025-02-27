@@ -1,9 +1,16 @@
+from .apertures import Aperture
+from .rays import RayBundle
 import numpy as np
 
 class Surface:
     """ Surfaces are objects that can propagate RayBundles. They are the basic building blocks of optical systems.
     A derived class should implement the sag function, which calculates the sag of the surface at a given point."""
-    def __init__(self, origin, rotation, aperture, index1, index2):
+    def __init__(self,
+                 origin: np.ndarray,
+                 rotation: np.ndarray,
+                 aperture: Aperture,
+                 index1: float,
+                 index2: float):
         """ Create a Surface object
         Args:
           origin: 1 x 3 numpy array representing the origin of the surface in 3D space
@@ -12,13 +19,13 @@ class Surface:
           aperture: an Aperture object representing the aperture of the surface
           index1: the index of refraction of the medium the light is coming from
           index2: the index of refraction of the medium the light is going to. If 0, this is a mirror."""
-        self.origin = origin
-        self.rotation = rotation
+        self.origin = np.array(origin)
+        self.rotation = np.array(rotation)
         self.aperture = aperture
         self.index1 = index1
         self.index2 = index2
 
-    def sag(self, points):
+    def sag(self, points: np.ndarray):
         """ Calculate the sag of the surface for an aray of 2D points
         Args:
           points: a N x 2 numpy array representing the point in 2D (surface coordinates) space
@@ -26,7 +33,7 @@ class Surface:
           a N x 1 numpy array representing the sag of the surface at these points"""
         raise NotImplementedError("sag() is not implemented by the base class")
 
-    def normals(self, points):
+    def normals(self, points: np.ndarray):
         """ Calculate the normal of the surface at given points
         Args:
           points: a N x 2 numpy array representing the point in 2D (surface coordinates) space
@@ -54,7 +61,7 @@ class Surface:
 
         return normals
 
-    def intersections(self, ray_bundle):
+    def intersections(self, ray_bundle: RayBundle):
         """ Calculate the intersection of a RayBundle with the surface
         Args:
           ray_bundle: a RayBundle object
@@ -75,7 +82,7 @@ class Surface:
         return intersection_points
 
 
-    def refract(self, ray_bundle):
+    def refract(self, ray_bundle: RayBundle):
         """ Propagate a RayBundle going through the surface
         Args:
           ray_bundle: a RayBundle object
@@ -85,7 +92,8 @@ class Surface:
         raise NotImplementedError("propagate() is not implemented")
 
     def mesh(self):
-        """ Generate a mesh representing the surface. Used to display the surfaces
+        """ Generate a mesh representing the surface, in global coordinates.
+            Used to display the surfaces
         Returns:
           mesh_x: The x coordinates of the mesh points, as a 2D array
           mesh_y: The y coordinates of the mesh points, as a 2D array
@@ -95,12 +103,23 @@ class Surface:
         ys = mesh_y.flatten()
         points2d = np.array([xs, ys]).T
         zs = self.sag(points2d)
-        mesh_z = np.reshape(zs, mesh_x.shape)
+        # Transform the mesh to global coordinates
+        points_local = np.array([xs, ys, zs]).T
+        points_global = np.matmul(points_local, self.rotation.T) + self.origin
+        mesh_x = np.reshape(points_global[:, 0], mesh_x.shape)
+        mesh_y = np.reshape(points_global[:, 1], mesh_x.shape)
+        mesh_z = np.reshape(points_global[:, 2], mesh_x.shape)
         return mesh_x, mesh_y, mesh_z
 
 class SphericalSurface(Surface):
     """ A SphericalSurface is a Surface that has a spherical sag function"""
-    def __init__(self, origin, rotation, aperture, index1, index2, radius):
+    def __init__(self,
+                 origin: np.ndarray,
+                 rotation: np.ndarray,
+                 aperture: Aperture,
+                 index1: float,
+                 index2: float,
+                 radius: float):
         """ Create a SphericalSurface object
         Args:
           origin: 1 x 3 numpy array representing the origin of the surface in 3D space
@@ -112,7 +131,7 @@ class SphericalSurface(Surface):
         super().__init__(origin, rotation, aperture, index1, index2)
         self.radius = radius
 
-    def sag(self, points):
+    def sag(self, points: np.ndarray):
         """ Calculate the sag of the surface for an aray of 2D points
         Args:
           points: a N x 2 numpy array representing the point in 2D (surface coordinates) space

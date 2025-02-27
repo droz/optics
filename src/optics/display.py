@@ -1,12 +1,89 @@
-from optics.surfaces import Surface
-from optics.rays import RayBundle
+from .surfaces import Surface
+from .rays import RayBundle
+from .screen import Screen
+from .system import System
 from chart_studio import plotly as plotly
 from plotly.offline import plot
 import plotly.graph_objs as graphs
 import numpy as np
 
+def meshContour(x, y, z):
+    """ A utility function to find the indexes of the mesh points that form the contour of the mesh.
+        It will know how to handle meshes that close on themselves
+    Args:
+        x: a 2D numpy array representing the x coordinates of the mesh points
+        y: a 2D numpy array representing the y coordinates of the mesh points
+    Returns:
+        starts_i: the first indices of the start points of the contours
+        starts_j: the second indices of the start points of the contours
+        ends_i: the first indices of the end points of the contours
+        end_j: the second indices of the end points of the contours
+        """
+    # In the simplest case, we just need to use the segments on the edges of the mesh
+    nr = x.shape[0]
+    nc = x.shape[1]
+    n = nr * nc
+    starts_i = []
+    starts_j = []
+    ends_i = []
+    ends_j = []
+    # Vertical side 1
+    starts_i += range(0, nr - 1)
+    starts_j += [0] * (nr - 1)
+    ends_i   += range(1, nr)
+    ends_j   += [0] * (nr - 1)
+    # Vertical side 2
+    starts_i += range(0, nr - 1)
+    starts_j += [nc-1] * (nr - 1)
+    ends_i   += range(1, nr)
+    ends_j   += [nc-1] * (nr - 1)
+    # Horizontal side 1
+    starts_i += [0] * (nc - 1)
+    starts_j += range(0, nc - 1)
+    ends_i   += [0] * (nc - 1)
+    ends_j   += range(1, nc)
+    # Horizontal side 2
+    starts_i += [nr - 1] * (nc - 1)
+    starts_j += range(0, nc - 1)
+    ends_i   += [nr - 1] * (nc - 1)
+    ends_j   += range(1, nc)
+
+    # If two segments overlap, do not display them
+    good_idx = []
+    for i in range(len(starts_i)):
+        found_overlap = False
+        for j in range(len(starts_i)):
+            if i == j:
+                continue
+            dist1 = max(abs(x[starts_i[i], starts_j[i]] - x[starts_i[j], starts_j[j]]),
+                        abs(y[starts_i[i], starts_j[i]] - y[starts_i[j], starts_j[j]]),
+                        abs(z[starts_i[i], starts_j[i]] - z[starts_i[j], starts_j[j]]),
+                        abs(x[ends_i[i], ends_j[i]] - x[ends_i[j], ends_j[j]]),
+                        abs(y[ends_i[i], ends_j[i]] - y[ends_i[j], ends_j[j]]),
+                        abs(z[ends_i[i], ends_j[i]] - z[ends_i[j], ends_j[j]]))
+            dist2 = max(abs(x[starts_i[i], starts_j[i]] - x[ends_i[j], ends_j[j]]),
+                        abs(y[starts_i[i], starts_j[i]] - y[ends_i[j], ends_j[j]]),
+                        abs(z[starts_i[i], starts_j[i]] - z[ends_i[j], ends_j[j]]),
+                        abs(x[ends_i[i], ends_j[i]] - x[starts_i[j], starts_j[j]]),
+                        abs(y[ends_i[i], ends_j[i]] - y[starts_i[j], starts_j[j]]),
+                        abs(z[ends_i[i], ends_j[i]] - z[starts_i[j], starts_j[j]]))
+            if dist1 < 1e-6 or dist2 < 1e-6:
+                found_overlap = True
+                break
+        if not found_overlap:
+            good_idx.append(i)
+    starts_i = [starts_i[i] for i in good_idx]
+    starts_j = [starts_j[i] for i in good_idx]
+    ends_i = [ends_i[i] for i in good_idx]
+    ends_j = [ends_j[i] for i in good_idx]
+
+    return starts_i, starts_j, ends_i, ends_j
+
+
 def surfaceSceneData(surface: Surface,
+                     
                      show_surface: bool,
+                     show_contours: bool,
                      show_wireframe: bool,
                      show_normals: bool):
     """ Generate the data to display a surface
@@ -19,6 +96,7 @@ def surfaceSceneData(surface: Surface,
         a list of graph objects that can be displayed with plotly"""
     # Get the mesh from the surface object
     x, y, z = surface.mesh()
+    
     # Generate sub-sampled indexes
     subrange_x = list(range(0, x.shape[0], 5))
     if x.shape[0] - 1 not in subrange_x:
@@ -48,7 +126,7 @@ def surfaceSceneData(surface: Surface,
 
     if show_wireframe:
         # We also add lines to highlight the shape of the surface
-        line_format = dict(color='black', width=2)
+        line_format = dict(color='gray', width=2)
         # An array full of NaNs to separate the different wires
         nans0 = np.full((len(subrange_x), 1), np.nan)
         wire0_x = np.hstack((x[subrange_x, :], nans0)).flatten()
@@ -62,6 +140,17 @@ def surfaceSceneData(surface: Surface,
         wire_y = np.concatenate((wire0_y, wire1_y))
         wire_z = np.concatenate((wire0_z, wire1_z))
         scene_data.append(graphs.Scatter3d(x=wire_x, y=wire_y, z=wire_z, mode='lines', line=line_format, showlegend=False))
+
+    if show_contours:
+        # Lens contour if requested
+        line_format = dict(color='black', width=5)
+        si, sj, ei, ej = meshContour(x, y, z)
+        # An array full of NaNs to separate the different wires
+        nans = np.full(len(si), np.nan)
+        contour_x = np.vstack((x[si, sj], x[ei, ej], nans)).T.flatten()
+        contour_y = np.vstack((y[si, sj], y[ei, ej], nans)).T.flatten()
+        contour_z = np.vstack((z[si, sj], z[ei, ej], nans)).T.flatten()
+        scene_data.append(graphs.Scatter3d(x=contour_x, y=contour_y, z=contour_z, mode='lines', line=line_format, showlegend=False))
 
     if show_normals:
         # Compute the normals at the mesh points
@@ -162,81 +251,142 @@ def rayBundleSceneData(rays: RayBundle, show_display_rays: bool, show_all_rays: 
 
     return scene_data
 
+def screenSceneData(screen: Screen,
+                    show_contours: bool,
+                    show_surface: bool,
+                    show_screen_intersections: bool):
+    """ Generate the data to display a screen
+    Args:
+        screen: a Screen object
+        show_surface: a boolean indicating if the screen surface should be displayed
+        show_contours: a boolean indicating if the contours of the screen should be displayed
+        show_screen_intersections: a boolean indicating if the screen/rays intersections should be displayed
+    Returns:
+        a list of graph objects that can be displayed with plotly"""
+    # Get the mesh from the screen object
+    x, y, z = screen.mesh()
+
+    scene_data = []
+    if show_surface:
+        color = 'blue'
+        # Generate a triangulation for the mesh
+        vertices_indices = np.arange(0, x.shape[0] * x.shape[1], 1).reshape(x.shape)
+        i0 = vertices_indices[0:-1, 0:-1].flatten()
+        j0 = vertices_indices[1:, 0:-1].flatten()
+        k0 = vertices_indices[1:, 1:].flatten()
+        i1 = vertices_indices[0:-1, 0:-1].flatten()
+        j1 = vertices_indices[1:, 1:].flatten()
+        k1 = vertices_indices[0:-1, 1:].flatten()
+        scene_data.append(graphs.Mesh3d(x=x.flatten(), y=y.flatten(), z=z.flatten(),
+                                        i=np.concatenate((i0,i1)), j=np.concatenate((j0,j1)), k=np.concatenate((k0,k1)),
+                                        colorscale=[[0, color], [1, color]],
+                                        showscale=False,
+                                        flatshading=False,
+                                        lighting=dict(ambient=0.8, diffuse=0.5, specular=0.5, roughness=0.5)))
+
+    if show_contours:
+        # Lens contour if requested
+        line_format = dict(color='black', width=5)
+        si, sj, ei, ej = meshContour(x, y, z)
+        # An array full of NaNs to separate the different wires
+        nans = np.full(len(si), np.nan)
+        contour_x = np.vstack((x[si, sj], x[ei, ej], nans)).T.flatten()
+        contour_y = np.vstack((y[si, sj], y[ei, ej], nans)).T.flatten()
+        contour_z = np.vstack((z[si, sj], z[ei, ej], nans)).T.flatten()
+        scene_data.append(graphs.Scatter3d(x=contour_x, y=contour_y, z=contour_z, mode='lines', line=line_format, showlegend=False))
+
+    return scene_data
+
 def display(object: object,
             show_surface: bool = True,
+            show_contours: bool = True,
             show_wireframe: bool = True,
             show_normals: bool = False,
             show_display_rays: bool = True,
-            show_all_rays: bool = False):
+            show_all_rays: bool = False,
+            show_screen_intersections: bool = False):
     """ Display an element of the optics system
     Args:
         object: an object that is part of the library (system, surface, aperture, ray_bundle)
         show_surface: a boolean indicating if the surface should be displayed
+        show_contours: a boolean indicating if the elements contours should be displayed
         show_wireframe: a boolean indicating if the wireframe should be displayed
         show_normals: a boolean indicating if the normals should be displayed
         show_display_rays: a boolean indicating if the display rays should be displayed
-        show_all_rays: a boolean indicating if all the rays should be displayed"""
+        show_all_rays: a boolean indicating if all the rays should be displayed
+        show_screen_intersections: a boolean indicating if the screen/rays intersections should be displayed"""
     # Do different things depending on the type of object
     if isinstance(object, Surface):
         surface = object
         # Get the scene data
         scene_data = surfaceSceneData(surface,
                                       show_surface=show_surface,
+                                      show_contours=show_contours,
                                       show_wireframe=show_wireframe,
                                       show_normals=show_normals)
-        # Create the layout
-        layout = graphs.Layout(
-            title='Surface sag',
-            autosize=False,
-            scene=dict(
-                xaxis=dict(
-                    gridcolor='rgb(255, 255, 255)',
-                    showbackground=False,
-                ),
-                yaxis=dict(
-                    gridcolor='rgb(255, 255, 255)',
-                    zerolinecolor='rgb(255, 255, 255)',
-                    showbackground=False,
-                ),
-                zaxis=dict(
-                    gridcolor='rgb(255, 255, 255)',
-                    zerolinecolor='rgb(255, 255, 255)',
-                    showbackground=False,
-                ),
-                aspectmode='data',
-            )
-        )
-        fig = graphs.Figure(data=scene_data, layout=layout)
-        plot(fig)
     if isinstance(object, RayBundle):
         rays = object
         # Get the scene data
         scene_data = rayBundleSceneData(rays,
                                         show_display_rays=show_display_rays,
                                         show_all_rays=show_all_rays)
-        # Create the layout
-        layout = graphs.Layout(
-            title='Surface sag',
-            autosize=False,
-            scene=dict(
-                xaxis=dict(
-                    gridcolor='rgb(255, 255, 255)',
-                    showbackground=False,
-                ),
-                yaxis=dict(
-                    gridcolor='rgb(255, 255, 255)',
-                    zerolinecolor='rgb(255, 255, 255)',
-                    showbackground=False,
-                ),
-                zaxis=dict(
-                    gridcolor='rgb(255, 255, 255)',
-                    zerolinecolor='rgb(255, 255, 255)',
-                    showbackground=False,
-                ),
-                aspectmode='data',
-            )
-        )
-        fig = graphs.Figure(data=scene_data, layout=layout)
-        plot(fig)
+        
+    if isinstance(object, Screen):
+        screen = object
+        scene_data = screenSceneData(screen,
+                                     show_surface=show_surface,
+                                     show_contours=show_contours,
+                                     show_screen_intersections=show_screen_intersections)
+
+    if isinstance(object, System):
+        system = object
+        scene_data = []
+        # Display the surfaces
+        for surface in system.surfaces:
+            scene_data += surfaceSceneData(surface,
+                                           show_surface=show_surface,
+                                           show_contours=show_contours,
+                                           show_wireframe=show_wireframe,
+                                           show_normals=show_normals)
+        # Display the screens
+        for screen in system.screens:
+            scene_data += screenSceneData(screen,
+                                          show_surface=show_surface,
+                                          show_contours=show_contours,
+                                          show_screen_intersections=show_screen_intersections)
+        # Display the rays
+        for rays in system.rays:
+            scene_data += rayBundleSceneData(rays,
+                                             show_display_rays=show_display_rays,
+                                             show_all_rays=show_all_rays)
+
     else:
         raise NotImplementedError("display() is not implemented for this object")
+    # Create the layout
+    layout = graphs.Layout(
+        title='Surface sag',
+        autosize=True,
+        scene=dict(
+            xaxis=dict(
+                gridcolor='rgb(255, 255, 255)',
+                showbackground=False,
+            ),
+            yaxis=dict(
+                gridcolor='rgb(255, 255, 255)',
+                zerolinecolor='rgb(255, 255, 255)',
+                showbackground=False,
+            ),
+            zaxis=dict(
+                gridcolor='rgb(255, 255, 255)',
+                zerolinecolor='rgb(255, 255, 255)',
+                showbackground=False,
+            ),
+            aspectmode='data',
+            camera=dict(
+                up=dict(x=0, y=0, z=1),
+                eye=dict(x=1, y=0, z=0)
+            ),
+        )
+    )
+    fig = graphs.Figure(data=scene_data, layout=layout)
+    plot(fig)
